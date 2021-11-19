@@ -1,3 +1,4 @@
+use core::f64;
 use core::f64::consts::PI;
 use image::{ColorType, ImageBuffer, Rgb};
 use rand::Rng;
@@ -6,11 +7,13 @@ use std::sync::mpsc;
 use std::thread;
 
 const THREAD_COUNT: usize = 4;
-const CYCLES: usize = 10000;
-const PARTICLES_PER_THREAD: usize = 1000;
+const CYCLES: usize = 20000;
+const PARTICLES_PER_THREAD: usize = 50000;
 
-const WIDTH: isize = 1920 / 2;
-const HEIGHT: isize = 1080 / 2;
+const PARAMS: isize = 3;
+
+const WIDTH: isize = 1920;
+const HEIGHT: isize = 1080;
 
 const UNIT: f64 = 100.0;
 const G: f64 = 0.01;
@@ -21,6 +24,7 @@ struct Particle {
   y: f64,
   vx: f64,
   vy: f64,
+  entered: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -41,10 +45,10 @@ fn main() {
     let thread_tx = tx.clone();
     let obs = obstacles.clone();
     let handle = thread::spawn(move || {
-      let n = (WIDTH * HEIGHT) as usize;
-      let mut board = Vec::<usize>::with_capacity(n);
+      let n = (WIDTH * HEIGHT * PARAMS) as usize;
+      let mut board = Vec::<f64>::with_capacity(n);
       for _ in 0..n {
-        board.push(0);
+        board.push(0.0);
       }
       for _ in 0..PARTICLES_PER_THREAD {
         simulate_particle(&mut board, &obs);
@@ -54,7 +58,8 @@ fn main() {
     threads.push(handle);
   }
 
-  let mut board = [0 as usize; (WIDTH * HEIGHT) as usize];
+  let n = (WIDTH * HEIGHT * PARAMS) as usize;
+  let mut board = vec![0.0 as f64; n];
   for _ in 0..THREAD_COUNT {
     let res = rx.recv().unwrap();
     for i in 0..res.len() {
@@ -62,22 +67,30 @@ fn main() {
     }
   }
 
-  let mut max_val = 0;
-  for v in board.iter() {
-    max_val = max(*v, max_val);
+  let mut max_loc = 0.0;
+  let mut max_v = 0.0;
+  for i in 0..(WIDTH * HEIGHT) as usize {
+    let offset = (WIDTH * HEIGHT) as usize;
+    max_loc = f64::max(board[i], max_loc);
+    max_v = f64::max(board[i + offset] / board[i], max_v);
   }
+  println!("max_v: {} max_loc: {}", max_v, max_loc);
 
   let image = ImageBuffer::from_fn(WIDTH as u32, HEIGHT as u32, |x, y| {
     let i = x + y * (WIDTH as u32);
     let c = board[i as usize];
-    if c > 0 {
-      let intensity = c as f64 / max_val as f64;
-      let mut r = intensity.powf(0.5);
+    if c > 0.0 {
+      let i = i as usize;
+      let offset = (WIDTH * HEIGHT) as usize;
+      let loc = board[i] / max_loc;
+      let v = (board[i + offset] / board[i]) / 0.3; //max_v;
+      let mut r = f64::max(0.0, 1.0 - v);
+      r = r.powf(3.0);
       r *= 256.0;
-      let mut g = (intensity - 0.5) % 1.0;
+      let mut g = loc;
       g = g.powf(4.0);
       g *= 256.0;
-      let mut b = (intensity - 0.9) % 1.0;
+      let mut b = loc % 1.0;
       b = b.powf(0.5);
       b *= 256.0;
       return Rgb([r as u8, g as u8, b as u8]);
@@ -106,6 +119,7 @@ fn random_particle() -> Particle {
     y: r * theta.sin(),
     vx: -theta.cos() * v,
     vy: -theta.sin() * v,
+    entered: false,
   };
   p
 }
@@ -123,7 +137,7 @@ fn norm2(x: f64, y: f64) -> f64 {
   return x.powf(2.0) + y.powf(2.0);
 }
 
-fn simulate_particle(board: &mut Vec<usize>, obstacles: &Vec<Obstacle>) {
+fn simulate_particle(board: &mut Vec<f64>, obstacles: &Vec<Obstacle>) {
   let mut p = random_particle();
   for _ in 0..CYCLES {
     if norm2(p.x, p.y) > 9.0 * UNIT * UNIT {
@@ -142,8 +156,13 @@ fn simulate_particle(board: &mut Vec<usize>, obstacles: &Vec<Obstacle>) {
       p.vy += dy * G / r.powf(2.0);
     }
     if id != -1 {
+      p.entered = true;
       let id = id as usize;
-      board[id] += 1;
+      let offset = (WIDTH * HEIGHT) as usize;
+      board[id] += 1.0;
+      board[id + offset] += (p.vx.powf(2.0) + p.vy.powf(2.0)).powf(0.5);
+    } else if p.entered {
+      return;
     }
   }
   println!("terminated");
