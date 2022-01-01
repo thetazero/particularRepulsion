@@ -6,14 +6,20 @@ use std::cmp::max;
 use std::sync::mpsc;
 use std::thread;
 
-const THREAD_COUNT: usize = 4;
+const THREAD_COUNT: usize = 6;
 const CYCLES: usize = 20000;
-const PARTICLES_PER_THREAD: usize = 50000;
+const PARTICLES_PER_THREAD: usize = 1000000;
+// const PARTICLES_PER_THREAD: usize = 300000;
+// const PARTICLES_PER_THREAD: usize = 30000;
+// const PARTICLES_PER_THREAD: usize = 3000;
 
 const PARAMS: isize = 3;
 
-const WIDTH: isize = 1920;
-const HEIGHT: isize = 1080;
+const WIDTH: isize = 1920 * 2;
+const HEIGHT: isize = 1080 * 2;
+
+// const WIDTH: isize = 1080;
+// const HEIGHT: isize = 2340;
 
 const UNIT: f64 = 100.0;
 const G: f64 = 0.01;
@@ -86,6 +92,10 @@ fn main() {
       let v = (board[i + offset] / board[i]) / 0.3; //max_v;
       let mut r = f64::max(0.0, 1.0 - v);
       r = r.powf(3.0);
+      if r > 0.55 {
+        r *= 256.0;
+        return Rgb([r as u8, (r / 2.0) as u8, r as u8]);
+      }
       r *= 256.0;
       let mut g = loc;
       g = g.powf(4.0);
@@ -171,9 +181,14 @@ fn simulate_particle(board: &mut Vec<f64>, obstacles: &Vec<Obstacle>) {
 fn random_obstacle() -> Obstacle {
   let mut rng = rand::thread_rng();
   let m = max(WIDTH, HEIGHT) as f64;
-  let w = (WIDTH as f64) / m * UNIT;
-  let h = (HEIGHT as f64) / m * UNIT;
+  // let w = (WIDTH as f64) / m * UNIT;
+  // let h = (HEIGHT as f64) / m * UNIT;
+  let w = UNIT;
+  let h = UNIT;
   let x = (rng.gen::<f64>() - 0.5) * w;
   let y = (rng.gen::<f64>() - 0.5) * h;
-  Obstacle { x, y }
+  Obstacle {
+    x: x * 0.9,
+    y: y * 0.9,
+  } //no obstacles at borders
 }
