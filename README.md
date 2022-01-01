@@ -1,5 +1,5 @@
 # particularRepulsion
-Millions of particles launched at 20 static objects with negative mass create beautiful patterns. 
+Millions of particles launched at 20 static objects with negative mass creates beautiful patterns. 
 Used this as an excuse to learn multithreading in rust (and rust in general).
 
 In particular for creating the image below I used 6 million particles split evenly among 6 threads. 
